@@ -1,337 +1,272 @@
-# Smart Attendance System
+# Face Recognition Attendance System
 
-A comprehensive face recognition-based attendance management system built with FastAPI, FAISS vector database, and real-time WebSocket communication.
+A real-time face recognition system for automated attendance tracking using deep learning and FAISS vector search. This project implements an efficient face recognition pipeline with a user-friendly Streamlit interface for live video processing.
 
-## 🚀 Features
+## 🌟 Features
 
-- **Real-time Face Recognition**: Live camera feed with instant face detection and recognition
-- **Student Registration**: Upload multiple photos per student for better recognition accuracy
-- **WebSocket Communication**: Real-time attendance marking via WebSocket
-- **Vector Database**: FAISS for fast and accurate face matching
-- **Attendance Tracking**: Complete attendance records with timestamps
-- **Modern Web Interface**: Responsive HTML/CSS/JavaScript frontend
-- **Cooldown Protection**: Prevents duplicate attendance marking
-- **Export Functionality**: Export attendance logs to CSV
-
-## 🛠️ Technologies Used
-
-### Backend
-- **FastAPI**: Modern, fast web framework for building APIs
-- **SQLAlchemy**: SQL toolkit and ORM for database operations
-- **MySQL**: Relational database for student and attendance data
-- **FAISS**: Vector database for face embedding storage and search
-- **DeepFace**: Face recognition library with FaceNet model
-- **OpenCV**: Computer vision library for image processing
-- **WebSockets**: Real-time communication between frontend and backend
-
-### Frontend
-- **HTML5**: Semantic markup
-- **CSS3**: Modern styling with responsive design
-- **JavaScript (ES6+)**: Client-side functionality
-- **WebRTC**: Camera access and video streaming
+- **Real-time Face Recognition**: Recognizes faces from live webcam feed with high accuracy
+- **FAISS Vector Search**: Ultra-fast face matching using Facebook AI Similarity Search
+- **Automated Attendance Logging**: Automatically logs attendance with timestamps to CSV files
+- **Streamlit Web Interface**: Interactive video streaming interface with real-time recognition display
+- **Pre-computed Embeddings**: Efficient face encoding using pre-computed embeddings for faster recognition
+- **Configurable Settings**: Easy configuration through YAML file for model parameters and paths
+- **Multiple Person Support**: Handles multiple faces in a single frame
+- **Attendance Management**: Organized attendance logs with date-stamped CSV files
 
 ## 📁 Project Structure
 
 ```
 Face-Recognition-Project/
-├── backend/                    # FastAPI backend
-│   ├── api/                   # API routes
-│   │   ├── attendance_routes.py
-│   │   └── student_routes.py
-│   ├── core/                  # Configuration
-│   │   └── config.py
-│   ├── schemas/               # Pydantic models
-│   │   ├── student.py
-│   │   └── attendance.py
-│   ├── services/              # Business logic
-│   │   └── stream_manager.py
-│   ├── main.py               # FastAPI application
-│   └── requirements.txt      # Python dependencies
-├── db/                       # Database files
-│   ├── sql_db/              # MySQL database
-│   │   ├── database.py      # Database connection
-│   │   ├── models.py        # SQLAlchemy models
-│   │   └── crud.py          # Database operations
-│   └── vector_db/           # FAISS vector database
-│       ├── faiss_manager.py # FAISS operations
-│       ├── face_index.bin   # Vector index (auto-generated)
-│       └── index_to_id.json # Index mapping (auto-generated)
-├── face_detection_and_recognition/
-│   ├── models/              # ML model files
-│   │   └── facenet_model.h5
-│   ├── face_encoder.py      # Face embedding generation
-│   ├── face_detector.py     # Face detection
-│   ├── face_recognizer.py   # Main recognition logic
-│   └── utils.py             # Utility functions
-├── frontend/                # Web interface
-│   ├── css/
-│   │   └── style.css        # Styling
-│   ├── js/
-│   │   ├── main.js          # Main dashboard logic
-│   │   └── register.js      # Registration logic
-│   ├── assets/
-│   │   └── logo.png         # Logo and icons
-│   ├── index.html           # Main dashboard
-│   └── register.html        # Student registration
-├── dataset/                 # Student photos
-│   └── raw_images/
-│       ├── S001_John/       # Student folders
-│       │   ├── front.jpg
-│       │   ├── side.jpg
-│       │   └── smiling.jpg
-│       └── S002_Jane/
-│           ├── 1.jpg
-│           └── 2.jpg
-├── scripts/                 # Utility scripts
-│   ├── create_embeddings.py # Generate face embeddings
-│   └── test_camera.py       # Test camera functionality
-├── .gitignore              # Git ignore rules
-└── README.md               # This file
+├── src/                           # Core recognition modules
+│   ├── precompute_embeddings.py  # Generate face embeddings and FAISS index
+│   ├── recognize_faces.py        # Face recognition logic
+│   └── utils.py                  # Helper functions and utilities
+├── ui/                            # User interface
+│   └── video_stream.py           # Streamlit video streaming interface
+├── models/                        # Model storage
+│   ├── faiss_index.bin           # FAISS similarity search index
+│   └── embeddings.pkl            # Pre-computed face embeddings
+├── dataset/                       # Training images
+│   ├── person1/                  # Individual person directories
+│   │   ├── image1.jpg
+│   │   └── image2.jpg
+│   └── person2/
+│       └── image1.jpg
+├── attendance/                    # Attendance logs
+│   └── attendance_YYYY-MM-DD.csv # Daily attendance records
+├── config.yaml                    # Configuration file
+├── requirements.txt               # Python dependencies
+├── run_video.py                   # Main entry point
+└── start.ps1                      # PowerShell startup script
 ```
 
-## 🚀 Quick Start
+## 🚀 Getting Started
 
 ### Prerequisites
 
-- Python 3.8+
-- MySQL 8.0+
-- Webcam/Camera
-- Modern web browser with WebRTC support
+- Python 3.8 or higher
+- Webcam or video input device
+- Windows (for PowerShell script) or Unix-based system
 
 ### Installation
 
 1. **Clone the repository**
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/Thiyanesh07/Face-Recognition-Project.git
    cd Face-Recognition-Project
    ```
 
-2. **Install Python dependencies**
+2. **Install dependencies**
    ```bash
-   cd backend
    pip install -r requirements.txt
    ```
 
-3. **Setup MySQL database**
-   ```sql
-   CREATE DATABASE attendance_system;
-   CREATE USER 'attendance_user'@'localhost' IDENTIFIED BY 'your_password';
-   GRANT ALL PRIVILEGES ON attendance_system.* TO 'attendance_user'@'localhost';
-   FLUSH PRIVILEGES;
-   ```
+3. **Set up dataset**
+   - Create a directory for each person in the `dataset/` folder
+   - Add multiple images of each person (at least 3-5 images recommended)
+   - Example structure:
+     ```
+     dataset/
+     ├── John_Doe/
+     │   ├── photo1.jpg
+     │   ├── photo2.jpg
+     │   └── photo3.jpg
+     └── Jane_Smith/
+         ├── photo1.jpg
+         └── photo2.jpg
+     ```
 
-4. **Configure environment variables**
-   Create a `.env` file in the backend directory:
-   ```env
-   DATABASE_URL=mysql+pymysql://attendance_user:your_password@localhost:3306/attendance_system
-   VECTOR_DB_PATH=./db/vector_db
-   SECRET_KEY=your-secret-key-here
-   DEBUG=True
-   ```
-
-5. **Start the backend server**
+4. **Precompute face embeddings**
    ```bash
-   cd backend
-   python main.py
+   python src/precompute_embeddings.py
    ```
+   This will:
+   - Process all images in the `dataset/` directory
+   - Generate face embeddings using deep learning
+   - Build a FAISS index for fast similarity search
+   - Save results to `models/` directory
 
-6. **Open the frontend**
-   Open `frontend/index.html` in your web browser
+5. **Configure settings (optional)**
+   Edit `config.yaml` to customize:
+   - Model parameters
+   - Recognition thresholds
+   - File paths
+   - Camera settings
 
-### First-Time Setup
+### Usage
 
-1. **Register students**
-   - Go to the registration page
-   - Upload multiple clear photos of each student
-   - The system will automatically generate face embeddings
-
-2. **Test the system**
-   ```bash
-   python scripts/test_camera.py
-   ```
-
-3. **Start attendance tracking**
-   - Open the main dashboard
-   - Click "Start Camera" to enable webcam
-   - Click "Start Recognition" to begin face recognition
-   - Students will be automatically recognized and marked present
-
-## 📖 Usage Guide
-
-### Student Registration
-
-1. Navigate to the registration page
-2. Fill in student details:
-   - **Student ID**: Unique identifier (e.g., S001, 2024001)
-   - **Student Name**: Full name
-   - **Email**: Optional email address
-3. Upload multiple photos:
-   - Include different angles (front, side, smiling)
-   - Ensure good lighting and clear visibility
-   - Avoid sunglasses, hats, or face coverings
-4. Click "Register Student"
-5. The system will process images and create face embeddings
-
-### Attendance Tracking
-
-1. Open the main dashboard
-2. Click "Start Camera" to enable webcam access
-3. Click "Start Recognition" to begin real-time recognition
-4. Students will be automatically recognized when they appear in the camera
-5. Attendance is marked with a 1-minute cooldown to prevent duplicates
-6. View real-time attendance log on the dashboard
-
-### Managing Attendance Records
-
-- **View Records**: All attendance records are displayed in real-time
-- **Export Data**: Click "Export Log" to download CSV file
-- **Clear Log**: Click "Clear Log" to reset the current session
-- **Statistics**: View daily attendance statistics
-
-## 🔧 Configuration
-
-### Database Configuration
-
-Edit `backend/core/config.py` to modify database settings:
-
-```python
-DATABASE_URL = "mysql+pymysql://user:password@localhost:3306/database"
+#### Method 1: Using PowerShell Script (Windows)
+```powershell
+.\start.ps1
 ```
 
-### Face Recognition Settings
-
-Adjust recognition parameters in `backend/core/config.py`:
-
-```python
-FACE_DETECTION_CONFIDENCE = 0.7      # Face detection confidence threshold
-FACE_RECOGNITION_THRESHOLD = 0.6     # Face recognition similarity threshold
-EMBEDDING_DIMENSION = 512            # FaceNet embedding dimension
-```
-
-### WebSocket Settings
-
-Modify WebSocket behavior in `frontend/main.js`:
-
-```javascript
-// Recognition interval (milliseconds)
-setInterval(() => {
-    this.captureAndSendFrame();
-}, 2000);  // Send frame every 2 seconds
-```
-
-## 🧪 Testing
-
-### Test Camera Functionality
+#### Method 2: Using Python Directly
 ```bash
-python scripts/test_camera.py
+python run_video.py
 ```
 
-### Test Face Recognition
-```bash
-python scripts/create_embeddings.py --test path/to/test/image.jpg
+The Streamlit interface will launch automatically in your default web browser at `http://localhost:8501`
+
+### Using the Interface
+
+1. **Start Video Stream**: Click to enable webcam feed
+2. **Face Recognition**: System automatically detects and recognizes faces in real-time
+3. **Attendance Logging**: Recognized faces are logged with timestamps
+4. **View Results**: Check the `attendance/` folder for CSV files with attendance records
+
+## 🛠️ Technical Details
+
+### Core Components
+
+#### 1. Face Embedding Generation (`precompute_embeddings.py`)
+- Loads images from the dataset directory
+- Extracts facial features using deep learning models
+- Generates high-dimensional embedding vectors
+- Builds FAISS index for efficient similarity search
+- Stores embeddings and person labels for recognition
+
+#### 2. Face Recognition (`recognize_faces.py`)
+- Captures frames from video stream
+- Detects faces using computer vision techniques
+- Generates embeddings for detected faces
+- Performs similarity search against FAISS index
+- Returns identity with confidence scores
+- Implements attendance tracking logic
+
+#### 3. Utility Functions (`utils.py`)
+- Configuration loading and management
+- File I/O operations
+- Image preprocessing
+- Attendance CSV handling
+- Helper functions for data management
+
+#### 4. Streamlit Interface (`video_stream.py`)
+- Real-time video display
+- Face bounding box visualization
+- Recognition results overlay
+- Control buttons and settings
+- Responsive web interface
+
+### Technology Stack
+
+- **Deep Learning**: Face embedding generation and recognition
+- **FAISS**: Vector similarity search for fast face matching
+- **OpenCV**: Computer vision and video processing
+- **Streamlit**: Interactive web interface
+- **NumPy/Pandas**: Data manipulation and analysis
+- **PyYAML**: Configuration management
+
+### Performance Optimizations
+
+- **Pre-computed Embeddings**: Face encodings generated once and reused
+- **FAISS Index**: Sub-millisecond face matching even with large datasets
+- **Efficient Frame Processing**: Optimized video frame handling
+- **Lazy Loading**: Models loaded only when needed
+
+## 📊 Configuration
+
+The `config.yaml` file allows customization of:
+
+```yaml
+# Example configuration
+model:
+  name: "facenet"  # or other supported models
+  threshold: 0.6   # Recognition confidence threshold
+
+paths:
+  dataset: "dataset/"
+  models: "models/"
+  attendance: "attendance/"
+
+video:
+  camera_index: 0  # Default webcam
+  frame_width: 640
+  frame_height: 480
+  fps: 30
 ```
 
-### Test API Endpoints
-```bash
-# Health check
-curl http://localhost:8000/health
+## 📝 Attendance Records
 
-# Get students
-curl http://localhost:8000/api/students/
+Attendance logs are saved as CSV files in the `attendance/` directory:
 
-# Get attendance records
-curl http://localhost:8000/api/attendance/records
+```csv
+Name,Timestamp,Date,Time
+John Doe,2025-10-19 09:15:32,2025-10-19,09:15:32
+Jane Smith,2025-10-19 09:16:45,2025-10-19,09:16:45
 ```
 
-## 🐛 Troubleshooting
+## 🔧 Troubleshooting
 
 ### Common Issues
 
-1. **Camera not working**
-   - Check browser permissions for camera access
-   - Ensure camera is not being used by another application
-   - Try refreshing the page
+1. **Camera not detected**
+   - Check webcam connection
+   - Verify camera permissions
+   - Try changing `camera_index` in config.yaml
 
-2. **Face recognition not working**
-   - Ensure students are properly registered with clear photos
-   - Check lighting conditions
-   - Verify FAISS index is loaded (check backend logs)
+2. **Poor recognition accuracy**
+   - Add more training images per person
+   - Ensure good lighting in training images
+   - Adjust recognition threshold in config
+   - Verify image quality and face visibility
 
-3. **Database connection errors**
-   - Verify MySQL is running
-   - Check database credentials in `.env` file
-   - Ensure database exists and user has proper permissions
+3. **Slow performance**
+   - Reduce frame resolution in config
+   - Ensure FAISS index is properly built
+   - Check system resources
 
-4. **WebSocket connection failed**
-   - Check if backend server is running
-   - Verify WebSocket URL in frontend code
-   - Check firewall settings
+4. **Module import errors**
+   - Verify all dependencies are installed
+   - Check Python version compatibility
+   - Reinstall requirements: `pip install -r requirements.txt --force-reinstall`
 
-### Debug Mode
+## 🔒 Security & Privacy
 
-Enable debug mode by setting `DEBUG=True` in your `.env` file:
+- Face images and embeddings are stored locally
+- No data is transmitted to external servers
+- Attendance logs contain only names and timestamps
+- Consider encryption for sensitive deployments
+- Ensure compliance with local privacy regulations
 
-```env
-DEBUG=True
-```
+## 🚀 Future Enhancements
 
-This will provide detailed logging information.
-
-## 📊 Performance Optimization
-
-### For Large Datasets
-
-1. **Increase FAISS index size**:
-   ```python
-   # In faiss_manager.py
-   self.index = faiss.IndexFlatL2(dimension)  # For small datasets
-   # Use faiss.IndexIVFFlat for large datasets
-   ```
-
-2. **Optimize image processing**:
-   - Resize images to standard dimensions
-   - Use appropriate image quality settings
-   - Consider batch processing for embeddings
-
-3. **Database optimization**:
-   - Add indexes for frequently queried columns
-   - Use connection pooling
-   - Consider read replicas for reporting
-
-## 🔒 Security Considerations
-
-1. **HTTPS in Production**: Use HTTPS for all communications
-2. **Database Security**: Use strong passwords and restrict database access
-3. **API Security**: Implement authentication and rate limiting
-4. **Data Privacy**: Ensure compliance with privacy regulations
-5. **Image Storage**: Consider encrypting stored images
+- [ ] Support for multiple camera sources
+- [ ] Cloud storage integration for attendance logs
+- [ ] Mobile app interface
+- [ ] Advanced analytics and reporting
+- [ ] Integration with existing attendance systems
+- [ ] GPU acceleration for faster processing
+- [ ] Anti-spoofing measures (liveness detection)
+- [ ] User management dashboard
 
 ## 🤝 Contributing
 
+Contributions are welcome! Please follow these steps:
+
 1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## 🙏 Acknowledgments
 
-- [FastAPI](https://fastapi.tiangolo.com/) for the excellent web framework
-- [DeepFace](https://github.com/serengil/deepface) for face recognition capabilities
-- [FAISS](https://github.com/facebookresearch/faiss) for vector similarity search
-- [OpenCV](https://opencv.org/) for computer vision tools
+- [FAISS](https://github.com/facebookresearch/faiss) - Facebook AI Similarity Search for efficient vector matching
+- [OpenCV](https://opencv.org/) - Computer vision library for image and video processing
+- [Streamlit](https://streamlit.io/) - Framework for building interactive web applications
+- Deep learning community for face recognition models
 
-## 📞 Support
+## 📞 Contact & Support
 
-For support and questions:
-- Create an issue in the repository
-- Check the troubleshooting section
-- Review the API documentation at `http://localhost:8000/docs`
+For questions, issues, or suggestions:
+- Create an issue in this repository
+- Check existing issues for solutions
+- Review documentation and troubleshooting guide
 
 ---
 
-**Note**: This system is designed for educational and small-scale use. For production environments, consider additional security measures, scalability improvements, and compliance requirements.
+**Note**: This system is designed for educational purposes and small to medium-scale deployments. For production environments with high traffic or strict security requirements, consider additional hardening, scaling infrastructure, and compliance measures.
