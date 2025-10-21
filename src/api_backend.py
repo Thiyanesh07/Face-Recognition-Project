@@ -1,143 +1,232 @@
+import os
 from flask import Flask, request, jsonify
-import sqlite3
-from datetime import datetime
 from flask_cors import CORS
+import sqlite3
+from werkzeug.security import generate_password_hash, check_password_hash
+import jwt
+import datetime
+from functools import wraps
+from dotenv import load_dotenv
+
+# Load environment variables from .env if present
+load_dotenv()
+
+app = Flask(__name__)
+CORS(app)
+
+# Use your secret key
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 
+    '395013a876d03f3a7fa3b89851de17493cd8d74214c2cf364a292f3cca61e0a3')
 
 DB_PATH = "attendance_system.db"
 
-app = Flask(__name__)
-CORS(app)  # Allow frontend (Streamlit, React, etc.) to call this API
-
-
-# ---------- Helper ----------
-def get_db_connection():
+# ---------------- Database Initialization ----------------
+def init_db():
     conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+    c = conn.cursor()
 
+    # Students table
+    c.execute('''CREATE TABLE IF NOT EXISTS students (
+                    roll_no TEXT PRIMARY KEY,
+                    name TEXT NOT NULL
+                )''')
 
-# ---------- Student Routes ----------
-@app.route("/students", methods=["GET"])
-def get_students():
-    conn = get_db_connection()
-    students = conn.execute("SELECT * FROM students").fetchall()
-    conn.close()
-    return jsonify([dict(row) for row in students])
+    # Cameras table
+    c.execute('''CREATE TABLE IF NOT EXISTS cameras (
+                    camera_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ip_address TEXT NOT NULL
+                )''')
 
+    # Attendance table
+    c.execute('''CREATE TABLE IF NOT EXISTS attendance (
+                    attendance_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    roll_no TEXT NOT NULL,
+                    camera_id INTEGER NOT NULL,
+                    detected_time TEXT NOT NULL,
+                    date TEXT NOT NULL,
+                    FOREIGN KEY (roll_no) REFERENCES students (roll_no),
+                    FOREIGN KEY (camera_id) REFERENCES cameras (camera_id)
+                )''')
 
-@app.route("/students", methods=["POST"])
-def add_student():
-    data = request.get_json()
-    roll_no = data.get("roll_no")
-    name = data.get("name")
+    # Users table
+    c.execute('''CREATE TABLE IF NOT EXISTS users (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    email TEXT UNIQUE NOT NULL,
+                    password_hash TEXT NOT NULL
+                )''')
 
-    if not roll_no or not name:
-        return jsonify({"error": "roll_no and name are required"}), 400
+    # Preload users (email + password)
+    users = [
+        ("vihashinisv.cs24@bitsathy.ac.in", "CS465"),
+        ("varshinis.it24@bitsathy.ac.in", "IT333"),
+        ("thiyaneshd.ad24@bitsathy.ac.in", "AD328"),
+        ("kishorer.ad24@bitsathy.ac.in", "AD206")
+    ]
 
-    conn = get_db_connection()
-    try:
-        conn.execute("INSERT INTO students (roll_no, name) VALUES (?, ?)", (roll_no, name))
-        conn.commit()
-    except sqlite3.IntegrityError:
-        return jsonify({"error": "Student already exists"}), 409
-    finally:
-        conn.close()
+    for email, pwd in users:
+        c.execute("INSERT OR IGNORE INTO users (email, password_hash) VALUES (?, ?)",
+                  (email, generate_password_hash(pwd)))
 
-    return jsonify({"message": "Student added successfully"}), 201
-
-
-# ---------- Camera Routes ----------
-@app.route("/cameras", methods=["GET"])
-def get_cameras():
-    conn = get_db_connection()
-    cameras = conn.execute("SELECT * FROM cameras").fetchall()
-    conn.close()
-    return jsonify([dict(row) for row in cameras])
-
-
-@app.route("/cameras", methods=["POST"])
-def add_camera():
-    data = request.get_json()
-    ip_address = data.get("ip_address")
-
-    if not ip_address:
-        return jsonify({"error": "ip_address is required"}), 400
-
-    conn = get_db_connection()
-    conn.execute("INSERT INTO cameras (ip_address) VALUES (?)", (ip_address,))
     conn.commit()
     conn.close()
-    return jsonify({"message": "Camera added successfully"}), 201
+    print("✅ Database initialized with authentication users.")
 
 
-# ---------- Attendance Routes ----------
-@app.route("/attendance", methods=["GET"])
-def get_attendance():
-    """Fetch all attendance or filter by date/student."""
-    date = request.args.get("date")
-    roll_no = request.args.get("roll_no")
+# ---------------- JWT Token Protection ----------------
+def token_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = None
+        if 'Authorization' in request.headers:
+            token = request.headers['Authorization']
 
-    conn = get_db_connection()
-    query = "SELECT * FROM attendance"
-    params = []
+        if not token:
+            return jsonify({'error': 'Token missing'}), 401
 
-    if date or roll_no:
-        query += " WHERE"
-        conditions = []
-        if date:
-            conditions.append(" date=? ")
-            params.append(date)
-        if roll_no:
-            conditions.append(" roll_no=? ")
-            params.append(roll_no)
-        query += " AND ".join(conditions)
+        try:
+            data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+            current_user = data['email']
+        except jwt.ExpiredSignatureError:
+            return jsonify({'error': 'Token expired'}), 401
+        except jwt.InvalidTokenError:
+            return jsonify({'error': 'Invalid token'}), 401
 
-    query += " ORDER BY detected_time DESC"
-    rows = conn.execute(query, params).fetchall()
+        return f(current_user, *args, **kwargs)
+    return decorated
+
+
+# ---------------- Authentication ----------------
+@app.route('/auth/login', methods=['POST'])
+def login():
+    data = request.get_json()
+    email = data.get('email')
+    password = data.get('password')
+
+    if not email or not password:
+        return jsonify({'error': 'Email and password required'}), 400
+
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT * FROM users WHERE email=?", (email,))
+    user = c.fetchone()
     conn.close()
 
-    return jsonify([dict(row) for row in rows])
+    if not user or not check_password_hash(user[2], password):
+        return jsonify({'error': 'Invalid credentials'}), 401
+
+    token = jwt.encode({
+        'user_id': user[0],
+        'email': user[1],
+        'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=4)
+    }, app.config['SECRET_KEY'], algorithm='HS256')
+
+    return jsonify({'token': token})
 
 
-@app.route("/attendance", methods=["POST"])
-def log_attendance():
-    """Log attendance via API."""
-    data = request.get_json()
-    roll_no = data.get("roll_no")
-    camera_id = data.get("camera_id")
-
-    if not roll_no or not camera_id:
-        return jsonify({"error": "roll_no and camera_id are required"}), 400
-
-    conn = get_db_connection()
+# ---------------- Students ----------------
+@app.route('/students', methods=['GET'])
+@token_required
+def get_students(current_user):
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    now = datetime.now()
+    c.execute("SELECT * FROM students")
+    students = [{'roll_no': row[0], 'name': row[1]} for row in c.fetchall()]
+    conn.close()
+    return jsonify(students)
+
+
+@app.route('/students', methods=['POST'])
+@token_required
+def add_student(current_user):
+    data = request.get_json()
+    roll_no = data.get('roll_no')
+    name = data.get('name')
+    if not roll_no or not name:
+        return jsonify({'error': 'Missing fields'}), 400
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("INSERT OR IGNORE INTO students (roll_no, name) VALUES (?, ?)", (roll_no, name))
+    conn.commit()
+    conn.close()
+    return jsonify({'message': f'Student {name} added successfully'})
+
+
+# ---------------- Cameras ----------------
+@app.route('/cameras', methods=['GET'])
+@token_required
+def get_cameras(current_user):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT * FROM cameras")
+    cameras = [{'camera_id': row[0], 'ip_address': row[1]} for row in c.fetchall()]
+    conn.close()
+    return jsonify(cameras)
+
+
+@app.route('/cameras', methods=['POST'])
+@token_required
+def add_camera(current_user):
+    data = request.get_json()
+    ip_address = data.get('ip_address')
+    if not ip_address:
+        return jsonify({'error': 'Missing IP address'}), 400
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("INSERT INTO cameras (ip_address) VALUES (?)", (ip_address,))
+    conn.commit()
+    conn.close()
+    return jsonify({'message': f'Camera {ip_address} added successfully'})
+
+
+# ---------------- Attendance ----------------
+@app.route('/attendance', methods=['GET'])
+@token_required
+def get_attendance(current_user):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT * FROM attendance")
+    rows = c.fetchall()
+    conn.close()
+    records = [{'attendance_id': r[0], 'roll_no': r[1], 'camera_id': r[2],
+                'detected_time': r[3], 'date': r[4]} for r in rows]
+    return jsonify(records)
+
+
+@app.route('/attendance', methods=['POST'])
+@token_required
+def mark_attendance(current_user):
+    data = request.get_json()
+    roll_no = data.get('roll_no')
+    camera_id = data.get('camera_id')
+    if not roll_no or not camera_id:
+        return jsonify({'error': 'Missing fields'}), 400
+
+    now = datetime.datetime.now()
     date = now.strftime("%Y-%m-%d")
     detected_time = now.strftime("%Y-%m-%d %H:%M:%S")
 
-    # Avoid duplicate entry same day
-    c.execute("SELECT * FROM attendance WHERE roll_no=? AND date=? AND camera_id=?", (roll_no, date, camera_id))
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT * FROM attendance WHERE roll_no=? AND date=? AND camera_id=?",
+              (roll_no, date, camera_id))
     if c.fetchone():
         conn.close()
-        return jsonify({"message": "Already marked present today"}), 200
+        return jsonify({'message': 'Attendance already marked for today'}), 200
 
     c.execute("INSERT INTO attendance (roll_no, camera_id, detected_time, date) VALUES (?, ?, ?, ?)",
               (roll_no, camera_id, detected_time, date))
     conn.commit()
     conn.close()
+    return jsonify({'message': f'Attendance logged for {roll_no} at {detected_time}'})
 
-    return jsonify({"message": "Attendance logged successfully"}), 201
 
-
-# ---------- Root ----------
-@app.route("/", methods=["GET"])
+# ---------------- Root ----------------
+@app.route('/')
 def home():
-    return jsonify({
-        "status": "running",
-        "message": "Face Recognition Attendance API active 🚀"
-    })
+    return jsonify({'message': 'Secure Face Recognition Attendance API Running ✅'})
 
 
-# ---------- Run ----------
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+if __name__ == '__main__':
+    init_db()
+    app.run(host='0.0.0.0', port=5000, debug=True)
+
